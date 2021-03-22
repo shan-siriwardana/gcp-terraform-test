@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+    parameters {
+        string( description: 'RFC subject', 
+                name: 'rfc_subject',
+                defaultValue: 'cfn_ingest_example_subject'
+        )
+        text(
+                description: 'Execution parameter file to CFN template ', 
+                name: 'rfc_execution_params',
+                defaultValue: '{\n  "Name": "$name",\n  "Description": "$description",\n  "CloudFormationTemplateS3Endpoint": "$S3_url",\n  "VpcId" : "$vpc_id",\n  "Tags": [\n     {"Key": "$key1", "Value": "$value1"}\n  ],\n  "Parameters": [\n     {"Name": "$parameter_name", "Value": "$parameter_value"}\n  ],\n  "TimeoutInMinutes": 60\n}'
+        )
+    }
+    environment {
+        rfc_title = "${rfc_title}"
+        rfc_execution_params = "${rfc_execution_params}"
+        change_type = "ct-36cn2avfrrj9v"
+        rfc_template = "{\"ChangeTypeId\":\"CT_PLACEHOLDER\",\"ChangeTypeVersion\": \"2.0\",\"Title\": \"RFC_TITLE_PLACEHOLDER\"}"      
+    }
+    stages {
+            stage('Prepare AMS CLI arguments') {
+                steps {
+                    println "prepare RFC CLI input json file"
+                    sh 'echo ${rfc_template} > rfc_template.json'
+                    sh 'sed -i \'s+RFC_TITLE_PLACEHOLDER+\'${rfc_subject}\'+g\' "${WORKSPACE}"/rfc_template.json'
+                    sh 'sed -i \'s+CT_PLACEHOLDER+\'${change_type}\'+g\' "${WORKSPACE}"/rfc_template.json'
+                    sh 'mv "${WORKSPACE}"/rfc_template.json "${WORKSPACE}"/rfc_request.json'
+                    sh 'cat "${WORKSPACE}"/rfc_request.json'
+                    
+                    println "prepare RFC execution parameters"
+                    sh 'echo ${rfc_execution_params} > parameters.json'
+                    sh 'cat "${WORKSPACE}"/parameters.json'
+                }
+            }
+            stage('Raise RFC') {
+                steps {
+                    println "raise RFC"
+                    sh 'bash raise_rfc.sh'
+                }
+            }
+    }
+}
